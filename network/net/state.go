@@ -58,20 +58,16 @@ func (state *State) diff(state2 *State) (diff, diff2 Diff) {
 	for _, elem := range unique2 {
 		diff2.data[elem.Value] = values[elem.Index]
 	}
-	// NB: don't do this
-	// valueDiff := sliceDifference(values, values2)
 
 	fmt.Println(keys, values)
-
-	// ...
 
 	return diff, diff2
 }
 
 func (state *State) write(diff *Diff) {
-	// if diff.equal {
-	// 	return
-	// }
+	if len(diff.data) == 0 {
+		return
+	}
 
 	fmt.Printf("updating State: %v\nwith diff: %v", state, diff)
 }
