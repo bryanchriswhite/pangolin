@@ -14,13 +14,11 @@ type Options struct {
 }
 
 func Run(p *utils.Program, network net.Network, o Options) {
-	for _, node := range network {
-		go (func(node *net.NetNode) {
+		go (func(n *net.Network) {
 			// Loop forever every `interval`
 			ticker := time.NewTicker(o.Interval)
 			for t := range ticker.C {
-				node.RandomGossip(t)
+				n.RandomGossip(t)
 			}
-		})(node)
-	}
+		})(&network)
 }

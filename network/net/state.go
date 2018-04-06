@@ -3,8 +3,8 @@ package net
 import (
 	"../errors"
 	"../utils"
-	"fmt"
 	"github.com/boltdb/bolt"
+	"fmt"
 )
 
 // type TxId int
@@ -60,30 +60,29 @@ func (state *State) diff(state2 *State) (diff, diff2 Diff) {
 		diff2.data[elem.Value] = values[elem.Index]
 	}
 
-	fmt.Println(keys, values)
+	// fmt.Println(keys, values)
 
 	return diff, diff2
 }
 
 func (state *State) write(diff *Diff) {
-	if len(diff.data) == 0 {
-		return
-	}
-
+	fmt.Printf("updating bucket: %v\nwith diff: %v\n\n", string(state.Bucket), diff)
 	state.Db.Update(func(tx *bolt.Tx) (err error) {
 		err = error(nil)
 		b := tx.Bucket(state.Bucket)
+		fmt.Printf("bucket: %s\n%v", state.Bucket, b)
 
 		for key, value := range diff.data {
+			// fmt.Printf("key: %v\nvalue: %v\n", key, value)
 			err = coerce(key, value, func(k, v []byte) {
+				// fmt.Printf("k: %v\nv: %v\n\n", k, v)
 				b.Put(k, v)
 			})
-
 		}
 
+		// Database transaction is aborted if error is returned
 		return err
 	})
-	fmt.Printf("updating State: %v\nwith diff: %v", state, diff)
 }
 
 func coerce(key, value utils.Any, f func(k, v []byte)) (err error) {
@@ -120,6 +119,10 @@ func (d *Diff) populate(unique []elem, values Values) {
 	for _, elem := range unique {
 		d.data[elem.Value] = values[elem.Index]
 	}
+}
+
+func (d *Diff) isEmpty() bool {
+	return len(d.data) == 0
 }
 
 func sliceDiffs(slice, slice2 []utils.Any) (diff1, diff2 []elem) {
