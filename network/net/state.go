@@ -46,13 +46,17 @@ func (state *State) read(state2 *State) (Keys, Values) {
 }
 
 func (state *State) diff(state2 *State) (diff, diff2 Diff) {
-	diff = Diff{*state, *state2, &map[Any]Any{}}
-	diff2 = Diff{*state2, *state,}
+	diff = Diff{*state, *state2, map[Any]Any{}}
+	diff2 = Diff{*state2, *state, map[Any]Any{}}
 	keys, values := state.read(state)
 	keys2, values2 := state.read(state2)
 
-	for uniqueKey := range sliceDifference(keys, keys2) {
+	unique1, unique2 := sliceDiffs(keys, keys2)
+	diff.populate(unique1, values)
+	diff2.populate(unique2, values2)
 
+	for _, elem := range unique2 {
+		diff2.data[elem.Value] = values[elem.Index]
 	}
 	// NB: don't do this
 	// valueDiff := sliceDifference(values, values2)
@@ -73,27 +77,36 @@ func (state *State) write(diff *Diff) {
 }
 
 type elem struct {
-	index  int
-	index2 int
-	value  Any
+	Index  int
+	Value  Any
 	unique bool
 }
 
-func sliceDifference(slice, slice2 []Any) (diff []elem) {
+func (d *Diff) populate(unique []elem, values Values) {
+	for _, elem := range unique {
+		d.data[elem.Value] = values[elem.Index]
+	}
+}
+
+func sliceDiffs(slice, slice2 []Any) (diff1, diff2 []elem) {
+	diff1 = sliceDiff(slice, slice2)
+	diff2 = sliceDiff(slice2, slice)
+
+	return diff1, diff2
+}
+
+func sliceDiff(slice, slice2 []Any) (diff []elem) {
 	m := map[Any]elem{}
 
 	for i, v := range slice {
-		m[v] = elem{i, nil, v, true}
+		m[v] = elem{i, v, true}
 	}
-	for i, v := range slice2 {
+	for _, v := range slice2 {
 		e, ok := m[v]
 		if ok {
 			e.unique = false
-			e.index2 = i
 			break
 		}
-
-		m[v] = elem{nil, i, v, true}
 	}
 
 	for _, e := range m {
