@@ -5,6 +5,7 @@ import (
 	"log"
 )
 
+type Any interface{}
 type Program struct {
 	C chan int
 }

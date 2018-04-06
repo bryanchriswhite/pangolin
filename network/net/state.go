@@ -1,6 +1,8 @@
 package net
 
 import (
+	"../errors"
+	"../utils"
 	"fmt"
 	"github.com/boltdb/bolt"
 )
@@ -10,9 +12,8 @@ import (
 // type Tx struct {
 // 	Id TxId
 // }
-type Any interface{}
-type Keys []Any
-type Values []Any
+type Keys []utils.Any
+type Values []utils.Any
 
 type State struct {
 	Db     *bolt.DB
@@ -22,7 +23,7 @@ type State struct {
 type Diff struct {
 	state1 State
 	state2 State
-	data   map[Any]Any
+	data   map[utils.Any]utils.Any
 	// data   []Tx
 }
 
@@ -46,8 +47,8 @@ func (state *State) read(state2 *State) (Keys, Values) {
 }
 
 func (state *State) diff(state2 *State) (diff, diff2 Diff) {
-	diff = Diff{*state, *state2, map[Any]Any{}}
-	diff2 = Diff{*state2, *state, map[Any]Any{}}
+	diff = Diff{*state, *state2, map[utils.Any]utils.Any{}}
+	diff2 = Diff{*state2, *state, map[utils.Any]utils.Any{}}
 	keys, values := state.read(state)
 	keys2, values2 := state.read(state2)
 
@@ -69,12 +70,49 @@ func (state *State) write(diff *Diff) {
 		return
 	}
 
+	state.Db.Update(func(tx *bolt.Tx) (err error) {
+		err = error(nil)
+		b := tx.Bucket(state.Bucket)
+
+		for key, value := range diff.data {
+			err = coerce(key, value, func(k, v []byte) {
+				b.Put(k, v)
+			})
+
+		}
+
+		return err
+	})
 	fmt.Printf("updating State: %v\nwith diff: %v", state, diff)
+}
+
+func coerce(key, value utils.Any, f func(k, v []byte)) (err error) {
+	var _key, _value []byte
+
+	switch k := key.(type) {
+	case string:
+		_key = []byte(k)
+	default:
+		err = errors.NewCoercionError(k)
+	}
+
+	switch v := value.(type) {
+	case string:
+		_value = []byte(v)
+	default:
+		err = bolt.ErrIncompatibleValue
+	}
+
+	if err == nil {
+		f(_key, _value)
+	}
+
+	return err
 }
 
 type elem struct {
 	Index  int
-	Value  Any
+	Value  utils.Any
 	unique bool
 }
 
@@ -84,15 +122,15 @@ func (d *Diff) populate(unique []elem, values Values) {
 	}
 }
 
-func sliceDiffs(slice, slice2 []Any) (diff1, diff2 []elem) {
+func sliceDiffs(slice, slice2 []utils.Any) (diff1, diff2 []elem) {
 	diff1 = sliceDiff(slice, slice2)
 	diff2 = sliceDiff(slice2, slice)
 
 	return diff1, diff2
 }
 
-func sliceDiff(slice, slice2 []Any) (diff []elem) {
-	m := map[Any]elem{}
+func sliceDiff(slice, slice2 []utils.Any) (diff []elem) {
+	m := map[utils.Any]elem{}
 
 	for i, v := range slice {
 		m[v] = elem{i, v, true}
