@@ -44,7 +44,9 @@ func (state *State) read() (Keys, Values) {
 		}
 		keysSha := sha256.Sum256([]byte(fmt.Sprintf("%v", keys)))
 		valuesSha := sha256.Sum256([]byte(fmt.Sprintf("%v", keys)))
-		fmt.Printf("read: keys=%s, values=%s\n", fmt.Sprintf("%x", keysSha[:6]), fmt.Sprintf("%x", valuesSha[:6]))
+		keysSum := fmt.Sprintf("%x", keysSha[:6])
+		valuesSum := fmt.Sprintf("%x", valuesSha[:6])
+		fmt.Printf("read: keys sum: %s, values sum: %s\n", keysSum, valuesSum)
 
 		return nil
 	})
