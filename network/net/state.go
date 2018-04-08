@@ -4,7 +4,6 @@ import (
 	"../errors"
 	"../utils"
 	"github.com/boltdb/bolt"
-	"fmt"
 )
 
 // type TxId int
@@ -66,11 +65,11 @@ func (state *State) diff(state2 *State) (diff, diff2 Diff) {
 }
 
 func (state *State) write(diff *Diff) {
-	fmt.Printf("updating bucket: %v\nwith diff: %v\n\n", string(state.Bucket), diff)
+	// fmt.Printf("updating bucket: %v\nwith diff: %v\n\n", string(state.Bucket), diff)
 	state.Db.Update(func(tx *bolt.Tx) (err error) {
 		err = error(nil)
 		b := tx.Bucket(state.Bucket)
-		fmt.Printf("bucket: %s\n%v", state.Bucket, b)
+		// fmt.Printf("bucket: %s\n%v\n", state.Bucket, b)
 
 		for key, value := range diff.data {
 			// fmt.Printf("key: %v\nvalue: %v\n", key, value)
