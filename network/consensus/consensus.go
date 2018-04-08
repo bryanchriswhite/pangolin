@@ -5,6 +5,7 @@ import (
 	"../utils"
 	"time"
 	"os"
+	"log"
 )
 
 type Options struct {
@@ -18,7 +19,11 @@ func Run(p *utils.Program, network net.Network, o Options) {
 			// Loop forever every `interval`
 			ticker := time.NewTicker(o.Interval)
 			for t := range ticker.C {
-				n.RandomGossip(t)
+				err := n.RandomGossip(t)
+				if err != nil {
+					log.Fatal(err)
+					p.Exit(2)
+				}
 			}
 		})(&network)
 }

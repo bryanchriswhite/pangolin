@@ -10,6 +10,11 @@ type Program struct {
 	C chan int
 }
 
+func (p *Program) Exit(status int) {
+	p.C <- status
+	close(p.C)
+}
+
 func (p *Program) handleError(err error) {
 
 }

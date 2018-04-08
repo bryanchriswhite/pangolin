@@ -63,6 +63,6 @@ func handleSignals(p *utils.Program) {
 
 	for range interrupt {
 		fmt.Printf("Stopping... ")
-		close(p.C)
+		p.Exit(0)
 	}
 }

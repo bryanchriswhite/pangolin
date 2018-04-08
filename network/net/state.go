@@ -4,6 +4,8 @@ import (
 	"../errors"
 	"../utils"
 	"github.com/boltdb/bolt"
+	"fmt"
+	"strconv"
 )
 
 // type TxId int
@@ -22,12 +24,13 @@ type State struct {
 type Diff struct {
 	state1 State
 	state2 State
-	data   map[utils.Any]utils.Any
-	// data   []Tx
+	Data   map[utils.Any]utils.Any
+	// Data   []Tx
 }
 
 // TODO: return *[]TxId, *[]Tx
-func (state *State) read(state2 *State) (Keys, Values) {
+func (state *State) read() (Keys, Values) {
+	fmt.Printf("read bucket: %s\n", string(state.Bucket))
 	keys, values := new(Keys), new(Values)
 
 	state.Db.View(func(tx *bolt.Tx) error {
@@ -36,8 +39,9 @@ func (state *State) read(state2 *State) (Keys, Values) {
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			*keys = append(*keys, string(k))
 			*values = append(*values, string(v))
-			// fmt.Printf("key=%s, value=%s\n", k, v)
+			// fmt.Printf("read: key=%s, value=%s\n", k, v)
 		}
+		fmt.Printf("read: keys=%v, values=%v\n", keys, values)
 
 		return nil
 	})
@@ -45,64 +49,69 @@ func (state *State) read(state2 *State) (Keys, Values) {
 	return *keys, *values
 }
 
-func (state *State) diff(state2 *State) (diff, diff2 Diff) {
+func (state *State) Diff(state2 *State) (diff, diff2 Diff) {
 	diff = Diff{*state, *state2, map[utils.Any]utils.Any{}}
 	diff2 = Diff{*state2, *state, map[utils.Any]utils.Any{}}
-	keys, values := state.read(state)
-	keys2, values2 := state.read(state2)
+	keys, values := state.read()
+	keys2, values2 := state2.read()
+	fmt.Println("keys:", len(keys))
+	fmt.Println("keys2:", len(keys2))
 
 	unique1, unique2 := sliceDiffs(keys, keys2)
 	diff.populate(unique1, values)
 	diff2.populate(unique2, values2)
 
-	for _, elem := range unique2 {
-		diff2.data[elem.Value] = values[elem.Index]
-	}
-
-	// fmt.Println(keys, values)
-
 	return diff, diff2
 }
 
-func (state *State) write(diff *Diff) {
-	// fmt.Printf("updating bucket: %v\nwith diff: %v\n\n", string(state.Bucket), diff)
+func (state *State) write(diff *Diff) (err error) {
+	// fmt.Printf("updating bucket: %v\nwith Diff: %v\n\n", string(state.Bucket), Diff)
 	state.Db.Update(func(tx *bolt.Tx) (err error) {
-		err = error(nil)
 		b := tx.Bucket(state.Bucket)
-		// fmt.Printf("bucket: %s\n%v\n", state.Bucket, b)
+		// fmt.Printf("write bucket: %s\n", string(state.Bucket))
 
-		for key, value := range diff.data {
+		for key, value := range diff.Data {
 			// fmt.Printf("key: %v\nvalue: %v\n", key, value)
-			err = coerce(key, value, func(k, v []byte) {
-				// fmt.Printf("k: %v\nv: %v\n\n", k, v)
-				b.Put(k, v)
-			})
+			var boltErr error
+			err = coerce(func(coercion [][]byte) {
+				k, v := coercion[0], coercion[1]
+
+				// fmt.Printf("write k: %v; v: %v\n", string(k), string(v))
+				boltErr = b.Put(k, v)
+			}, key, value)
+
+			if boltErr != nil {
+				return boltErr
+			}
+
+			if err != nil {
+				return err
+			}
 		}
 
 		// Database transaction is aborted if error is returned
 		return err
 	})
+
+	return err
 }
 
-func coerce(key, value utils.Any, f func(k, v []byte)) (err error) {
-	var _key, _value []byte
-
-	switch k := key.(type) {
-	case string:
-		_key = []byte(k)
-	default:
-		err = errors.NewCoercionError(k)
-	}
-
-	switch v := value.(type) {
-	case string:
-		_value = []byte(v)
-	default:
-		err = bolt.ErrIncompatibleValue
+func coerce(f func([][]byte), values ...utils.Any) (err error) {
+	_values := make([][]byte, 0)
+	for _, value := range values {
+		switch v := value.(type) {
+		case string:
+			_values = append(_values, []byte(v))
+		case int64:
+			_values = append(_values, []byte(strconv.FormatInt(v, 10)))
+		default:
+			err = errors.NewCoercionError(v)
+			break
+		}
 	}
 
 	if err == nil {
-		f(_key, _value)
+		f(_values)
 	}
 
 	return err
@@ -116,12 +125,12 @@ type elem struct {
 
 func (d *Diff) populate(unique []elem, values Values) {
 	for _, elem := range unique {
-		d.data[elem.Value] = values[elem.Index]
+		d.Data[elem.Value] = values[elem.Index]
 	}
 }
 
 func (d *Diff) isEmpty() bool {
-	return len(d.data) == 0
+	return len(d.Data) == 0
 }
 
 func sliceDiffs(slice, slice2 []utils.Any) (diff1, diff2 []elem) {
@@ -132,24 +141,27 @@ func sliceDiffs(slice, slice2 []utils.Any) (diff1, diff2 []elem) {
 }
 
 func sliceDiff(slice, slice2 []utils.Any) (diff []elem) {
-	m := map[utils.Any]elem{}
+	// fmt.Println("slice:", slice)
+	// fmt.Println("slice2:", slice2)
+	m := map[utils.Any]*elem{}
 
 	for i, v := range slice {
-		m[v] = elem{i, v, true}
+		m[v] = &elem{i, v, true}
 	}
+
 	for _, v := range slice2 {
 		e, ok := m[v]
 		if ok {
 			e.unique = false
-			break
 		}
 	}
 
 	for _, e := range m {
 		if e.unique == true {
-			diff = append(diff, e)
+			diff = append(diff, *e)
 		}
 	}
 
+	fmt.Println("diff:", diff)
 	return diff
 }
