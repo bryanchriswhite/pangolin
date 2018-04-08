@@ -6,6 +6,7 @@ import (
 	"github.com/boltdb/bolt"
 	"fmt"
 	"strconv"
+	"crypto/sha256"
 )
 
 // type TxId int
@@ -30,7 +31,7 @@ type Diff struct {
 
 // TODO: return *[]TxId, *[]Tx
 func (state *State) read() (Keys, Values) {
-	fmt.Printf("read bucket: %s\n", string(state.Bucket))
+	fmt.Printf("read: bucket: %s\n", string(state.Bucket))
 	keys, values := new(Keys), new(Values)
 
 	state.Db.View(func(tx *bolt.Tx) error {
@@ -41,7 +42,9 @@ func (state *State) read() (Keys, Values) {
 			*values = append(*values, string(v))
 			// fmt.Printf("read: key=%s, value=%s\n", k, v)
 		}
-		fmt.Printf("read: keys=%v, values=%v\n", keys, values)
+		keysSha := sha256.Sum256([]byte(fmt.Sprintf("%v", keys)))
+		valuesSha := sha256.Sum256([]byte(fmt.Sprintf("%v", keys)))
+		fmt.Printf("read: keys=%s, values=%s\n", fmt.Sprintf("%x", keysSha[:6]), fmt.Sprintf("%x", valuesSha[:6]))
 
 		return nil
 	})
@@ -49,19 +52,17 @@ func (state *State) read() (Keys, Values) {
 	return *keys, *values
 }
 
-func (state *State) Diff(state2 *State) (diff, diff2 Diff) {
+func (state *State) Diff(state2 *State) (diff Diff) {
 	diff = Diff{*state, *state2, map[utils.Any]utils.Any{}}
-	diff2 = Diff{*state2, *state, map[utils.Any]utils.Any{}}
 	keys, values := state.read()
-	keys2, values2 := state2.read()
-	fmt.Println("keys:", len(keys))
-	fmt.Println("keys2:", len(keys2))
+	keys2, _ := state2.read()
+	// fmt.Println("diff: keys:", len(keys))
+	// fmt.Println("diff: keys2:", len(keys2))
 
-	unique1, unique2 := sliceDiffs(keys, keys2)
-	diff.populate(unique1, values)
-	diff2.populate(unique2, values2)
+	unique := sliceDiff(keys, keys2)
+	diff.populate(unique, values)
 
-	return diff, diff2
+	return diff
 }
 
 func (state *State) write(diff *Diff) (err error) {
@@ -133,13 +134,6 @@ func (d *Diff) isEmpty() bool {
 	return len(d.Data) == 0
 }
 
-func sliceDiffs(slice, slice2 []utils.Any) (diff1, diff2 []elem) {
-	diff1 = sliceDiff(slice, slice2)
-	diff2 = sliceDiff(slice2, slice)
-
-	return diff1, diff2
-}
-
 func sliceDiff(slice, slice2 []utils.Any) (diff []elem) {
 	// fmt.Println("slice:", slice)
 	// fmt.Println("slice2:", slice2)
@@ -162,6 +156,6 @@ func sliceDiff(slice, slice2 []utils.Any) (diff []elem) {
 		}
 	}
 
-	fmt.Println("diff:", diff)
+	// fmt.Println("diff:", diff)
 	return diff
 }

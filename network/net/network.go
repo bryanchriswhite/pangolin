@@ -8,7 +8,7 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-const NetworkSize = 4
+const NetworkSize = 3
 
 type Network [NetworkSize]*NetNode
 
@@ -55,8 +55,8 @@ func (n *Network) RandomGossip(t time.Time) (err error) {
 
 	// d1, _ := node.State.Diff(&peer.State)
 	// fmt.Println("Node-peer diff1:", d1.Data)
-	node.sync(peer)
 	fmt.Printf("\nnode %d; contacting node: %d\n", node.Id, peer.Id)
+	node.sync(peer)
 	// nd1, nd2 := node.State.Diff(&peer.State)
 	// fmt.Println("Node-peer diff1:", nd1.Data)
 	// fmt.Println("Node-peer diff2:", nd2.Data)
@@ -66,7 +66,8 @@ func (n *Network) RandomGossip(t time.Time) (err error) {
 		}
 
 		// d1, d2 := peer.State.Diff(&p.State)
-		d1, d2 := node.State.Diff(&p.State)
+		d1 := node.State.Diff(&p.State)
+		d2 := p.State.Diff(&node.State)
 		fmt.Println("Peer-_peer diff1:", d1.Data)
 		fmt.Println("Peer-_peer diff2:", d2.Data)
 	}
@@ -75,7 +76,8 @@ func (n *Network) RandomGossip(t time.Time) (err error) {
 }
 
 func (n *NetNode) sync(peer *NetNode) {
-	_, peerDiff := n.State.Diff(&peer.State)
+	peerDiff := n.State.Diff(&peer.State)
+	fmt.Println("peerDiff:", peerDiff.Data)
 	// Update node's state
 	// if selfDiff.isEmpty() == false {
 	// 	n.State.write(&selfDiff)
