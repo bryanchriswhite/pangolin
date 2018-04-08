@@ -57,7 +57,8 @@ func (n *Network) RandomGossip(t time.Time) (err error) {
 	// fmt.Println("Node-peer diff1:", d1.Data)
 	fmt.Printf("\nnode %d; contacting node: %d\n", node.Id, peer.Id)
 	node.sync(peer)
-	// nd1, nd2 := node.State.Diff(&peer.State)
+	// nd1 := node.State.Diff(&peer.State)
+	// nd2 := peer.State.Diff(&node.State)
 	// fmt.Println("Node-peer diff1:", nd1.Data)
 	// fmt.Println("Node-peer diff2:", nd2.Data)
 	for _, p := range node.Peers {
@@ -65,9 +66,10 @@ func (n *Network) RandomGossip(t time.Time) (err error) {
 			continue
 		}
 
-		// d1, d2 := peer.State.Diff(&p.State)
-		d1 := node.State.Diff(&p.State)
-		d2 := p.State.Diff(&node.State)
+		// d1 := node.State.Diff(&p.State)
+		d1 := peer.State.Diff(&p.State)
+		// d2 := p.State.Diff(&node.State)
+		d2 := p.State.Diff(&peer.State)
 		fmt.Println("Peer-_peer diff1:", d1.Data)
 		fmt.Println("Peer-_peer diff2:", d2.Data)
 	}
@@ -76,12 +78,13 @@ func (n *Network) RandomGossip(t time.Time) (err error) {
 }
 
 func (n *NetNode) sync(peer *NetNode) {
+	selfDiff := peer.State.Diff(&n.State)
 	peerDiff := n.State.Diff(&peer.State)
 	fmt.Println("peerDiff:", peerDiff.Data)
 	// Update node's state
-	// if selfDiff.isEmpty() == false {
-	// 	n.State.write(&selfDiff)
-	// }
+	if selfDiff.isEmpty() == false {
+		n.State.write(&selfDiff)
+	}
 
 	// Find node's copy of `peer`
 	var _peer *NetNode
@@ -98,7 +101,7 @@ func (n *NetNode) sync(peer *NetNode) {
 	_peer.State.write(&peerDiff)
 
 	// Update peer's state? (use channel instaed?)
-	// peer.State.write(&peerDiff)
+	peer.State.write(&peerDiff)
 	// n.C <- &n.State
 }
 
